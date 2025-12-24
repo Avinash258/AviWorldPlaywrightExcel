@@ -3,15 +3,13 @@ trigger:
 
 variables:
   nodeVersion: '20.x'
-  artifactName: 'drop'
   npmCacheDir: '$(Pipeline.Workspace)/.npm'
 
 stages:
   - stage: BuildAndTest
-    displayName: Excel Playwright tests
+    displayName: Playwright Excel Tests
     jobs:
-      - job: BuildJob
-        displayName: Run Excel tests
+      - job: RunExcelTests
         pool:
           vmImage: 'ubuntu-latest'
 
@@ -21,7 +19,7 @@ stages:
               versionSpec: '$(nodeVersion)'
             displayName: 'Install Node.js'
 
-          # configure npm cache
+          # configure npm cache safely
           - script: |
               mkdir -p $(npmCacheDir)
               npm config set cache $(npmCacheDir)
@@ -39,22 +37,21 @@ stages:
               npm ci
             displayName: 'Install dependencies'
 
-          # install ONLY Chrome
+          # ✅ install Playwright browser (Chromium)
           - script: |
-              npx playwright install chrome
-              sudo npx playwright install-deps chrome
-            displayName: 'Install Chrome for Playwright'
+              npx playwright install chromium
+              sudo npx playwright install-deps chromium
+            displayName: 'Install Playwright Chromium browser'
 
-          # run ONLY your npm script
+          # ✅ run ONLY your npm script
           - script: |
               npm run test:excel -- --forbid-only --reporter=junit
             displayName: 'Run Playwright Excel tests'
 
           - task: PublishTestResults@2
-            displayName: 'Publish test results (JUnit)'
-            condition: succeededOrFailed()
             inputs:
               testResultsFormat: 'JUnit'
               testResultsFiles: '**/junit*.xml'
               mergeTestResults: true
               failTaskOnFailedTests: true
+            displayName: 'Publish test results'
