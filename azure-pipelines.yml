@@ -1,82 +1,69 @@
 trigger:
   - main
 
-parameters:
-  - name: specPath
-    type: string
-    default: ''  # e.g. tests/downloads/excel-file.spec.ts to run a single spec
-
 variables:
   nodeVersion: '20.x'
-  buildDir: 'dist'
-  artifactName: 'drop'
+  npmCacheDir: '$(Pipeline.Workspace)/.npm'
 
 stages:
   - stage: BuildAndTest
-    displayName: Build and Test (without build step)
+    displayName: Playwright Excel Tests
     jobs:
-      - job: BuildJob
-        displayName: Build job
+      - job: RunExcelTests
+        displayName: Run Playwright Excel Tests
         pool:
           vmImage: 'ubuntu-latest'
+
         steps:
           - task: NodeTool@0
             inputs:
               versionSpec: '$(nodeVersion)'
-            displayName: 'Install Node.js $(nodeVersion)'
+            displayName: 'Install Node.js'
+
+          - script: |
+              mkdir -p $(npmCacheDir)
+              npm config set cache $(npmCacheDir)
+            displayName: 'Configure npm cache'
 
           - task: Cache@2
             inputs:
               key: 'npm | "$(Agent.OS)" | package-lock.json'
               restoreKeys: |
                 npm | "$(Agent.OS)"
-              path: ~/.npm
-            displayName: 'Cache NPM'
+              path: '$(npmCacheDir)'
+            displayName: 'Cache npm modules'
 
           - script: |
               npm ci
-            displayName: 'Install dependencies (npm ci)'
+            displayName: 'Install dependencies'
 
-          # Removed: npm run build
-
+          # Install Playwright browser
           - script: |
-              npx playwright install --with-deps
-            displayName: 'Install Playwright browsers'
+              npx playwright install chromium
+              sudo npx playwright install-deps chromium
+            displayName: 'Install Playwright Chromium'
 
+          # Run tests and generate JUnit + HTML
           - script: |
-              if [ -n "${{ parameters.specPath }}" ]; then
-                echo "Running tests for specific spec: ${{ parameters.specPath }}"
-                npx playwright test "${{ parameters.specPath }}" --forbid-only --reporter=junit
-              else
-                echo "Running full test suite"
-                npx playwright test --forbid-only --reporter=junit
-              fi
-            displayName: 'Run Playwright tests (generate JUnit XML)'
+              npx playwright test \
+                --reporter=junit,html \
+                --output=test-results
+            displayName: 'Run Playwright tests'
 
+          # Surface results in Tests tab (from Microsoft doc)
           - task: PublishTestResults@2
-            displayName: 'Publish test results (JUnit)'
-            condition: succeededOrFailed()
+            displayName: 'Publish results to Tests tab'
             inputs:
               testResultsFormat: 'JUnit'
-              testResultsFiles: '**/junit*.xml'
+              testResultsFiles: 'test-results/*.xml'
+              searchFolder: '$(System.DefaultWorkingDirectory)'
               mergeTestResults: true
-              failTaskOnFailedTests: true
+              testRunTitle: 'Playwright UI automation tests'
+              failTaskOnFailedTests: false
 
-          - script: |
-              mkdir -p $(Build.ArtifactStagingDirectory)
-              cp -R $(buildDir)/* $(Build.ArtifactStagingDirectory) || true
-            displayName: 'Stage build artifacts (optional)'
-
+          # Publish detailed HTML report (with steps)
           - task: PublishPipelineArtifact@1
             inputs:
-              targetPath: '$(Build.ArtifactStagingDirectory)'
-              artifact: '$(artifactName)'
-            displayName: 'Publish pipeline artifact'
-
-          # Publish the test downloads (includes the updated Excel file)
-          - task: PublishPipelineArtifact@1
-            condition: succeededOrFailed()
-            inputs:
-              targetPath: '$(System.DefaultWorkingDirectory)/download'
-              artifact: 'test-downloads'
-            displayName: 'Publish test downloads (download/)'}
+              targetPath: 'playwright-report'
+              artifact: 'playwright-html-report'
+            displayName: 'Publish Playwright HTML report'
