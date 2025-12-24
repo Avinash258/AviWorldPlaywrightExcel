@@ -53,7 +53,8 @@ stages:
           - script: |
               mkdir -p test-results
               npx playwright test \
-                --reporter=junit=test-results/junit.xml,html \
+                --reporter=junit=test-results/junit.xml \
+                --reporter=html \
                 --forbid-only
             displayName: 'Run Playwright tests (JUnit + HTML)'
 
