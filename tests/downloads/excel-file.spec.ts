@@ -4,6 +4,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs/promises';
 import path from 'path';
+import type * as ExcelJSType from 'exceljs';
 
 test.describe('File Downloader - Functional', () => {
   test("Download Excel file and verify it's a valid spreadsheet", async ({ page }) => {
@@ -46,14 +47,14 @@ test.describe('File Downloader - Functional', () => {
       await workbook.xlsx.readFile(savedPath);
       const sheet = workbook.getWorksheet(1);
       let replaced = false;
-      sheet?.eachRow((row, rowNumber) => {
-        row.eachCell({ includeEmpty: true }, (cell) => {
-          const cellText = String(cell.value ?? '');
+      sheet?.eachRow((row: ExcelJSType.Row, rowNumber: number) => {
+        row.eachCell({ includeEmpty: true }, (cell: ExcelJSType.Cell) => {
+          const cellText: string = String(cell.value ?? '');
           if (cellText.includes('NO DEBE ESTAR')) {
-            for (let col = 1; col <= 4; col++) {
-              sheet.getRow(rowNumber).getCell(col).value = 'test';
-            }
-            replaced = true;
+        for (let col: number = 1; col <= 4; col++) {
+          sheet.getRow(rowNumber).getCell(col).value = 'test';
+        }
+        replaced = true;
           }
         });
       });
@@ -67,7 +68,7 @@ test.describe('File Downloader - Functional', () => {
       await workbook2.xlsx.readFile(savedPath);
       const sheet2 = workbook2.getWorksheet(1);
       let foundRowAllTest = false;
-      sheet2?.eachRow((row) => {
+      sheet2?.eachRow((row: ExcelJSType.Row) => {
         const vals: string[] = [1, 2, 3, 4].map((c: number) => String(row.getCell(c).value ?? ''));
         if (vals.every((v: string) => v === 'test')) foundRowAllTest = true;
       });
