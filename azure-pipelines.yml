@@ -15,16 +15,19 @@ stages:
           vmImage: 'ubuntu-latest'
 
         steps:
+          # Install Node
           - task: NodeTool@0
             inputs:
               versionSpec: '$(nodeVersion)'
             displayName: 'Install Node.js'
 
+          # Configure npm cache
           - script: |
               mkdir -p $(npmCacheDir)
               npm config set cache $(npmCacheDir)
             displayName: 'Configure npm cache'
 
+          # Cache node_modules
           - task: Cache@2
             inputs:
               key: 'npm | "$(Agent.OS)" | package-lock.json'
@@ -33,6 +36,7 @@ stages:
               path: '$(npmCacheDir)'
             displayName: 'Cache npm modules'
 
+          # Install dependencies
           - script: |
               npm ci
             displayName: 'Install dependencies'
@@ -43,40 +47,41 @@ stages:
               sudo npx playwright install-deps chromium
             displayName: 'Install Playwright Chromium'
 
-          # Debug listing before test run
+          # Debug listing BEFORE tests
           - script: |
               echo "Listing workspace before tests:"
               ls -R
             displayName: 'Debug: list files before tests'
 
-          # Run Playwright tests and generate JUnit + HTML
+          # ⭐ Run Playwright tests – generate JUnit + HTML
           - script: |
               mkdir -p test-results
               npx playwright test \
-                --reporter=junit=test-results/junit.xml \
+                --reporter=junit \
                 --reporter=html \
+                --output=test-results \
                 --forbid-only
             displayName: 'Run Playwright tests (JUnit + HTML)'
 
-          # Debug listing after test run
+          # Debug listing AFTER tests
           - script: |
               echo "Listing workspace after tests:"
               ls -R
             displayName: 'Debug: list files after tests'
 
-          # Publish JUnit to Tests tab
+          # ⭐ Publish JUnit file → Azure DevOps Tests tab
           - task: PublishTestResults@2
             displayName: 'Publish results to Tests tab'
             inputs:
               testResultsFormat: 'JUnit'
-              testResultsFiles: 'test-results/junit.xml'
+              testResultsFiles: 'test-results/results.xml'
               mergeTestResults: true
               testRunTitle: 'Playwright UI automation tests'
               failTaskOnFailedTests: false
 
-          # Publish HTML report (steps, screenshots, trace viewer)
+          # ⭐ Publish Playwright HTML report (steps, screenshots, traces)
           - task: PublishPipelineArtifact@1
+            displayName: 'Publish Playwright HTML report'
             inputs:
               targetPath: 'playwright-report'
               artifact: 'playwright-html-report'
-            displayName: 'Publish Playwright HTML report'
