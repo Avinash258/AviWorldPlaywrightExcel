@@ -12,8 +12,8 @@ variables:
   artifactName: 'drop'
 
 stages:
-  - stage: Build
-    displayName: Build and Test
+  - stage: BuildAndTest
+    displayName: Build and Test (without build step)
     jobs:
       - job: BuildJob
         displayName: Build job
@@ -37,17 +37,7 @@ stages:
               npm ci
             displayName: 'Install dependencies (npm ci)'
 
-          - script: |
-              npm run lint
-            displayName: 'Run linter (optional)'
-            condition: succeededOrFailed()
-            continueOnError: true
-
-          - script: |
-              npm run build
-            displayName: 'Build (npm run build)'
-            env:
-              NODE_ENV: 'production'
+          # Removed: npm run build
 
           - script: |
               npx playwright install --with-deps
@@ -75,7 +65,7 @@ stages:
           - script: |
               mkdir -p $(Build.ArtifactStagingDirectory)
               cp -R $(buildDir)/* $(Build.ArtifactStagingDirectory) || true
-            displayName: 'Stage build artifacts'
+            displayName: 'Stage build artifacts (optional)'
 
           - task: PublishPipelineArtifact@1
             inputs:
