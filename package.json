@@ -2,7 +2,10 @@
   "name": "play",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "test": "npx playwright test",
+    "test:excel": "npx playwright test tests/downloads/excel-file.spec.ts"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
