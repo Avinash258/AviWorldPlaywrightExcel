@@ -1,0 +1,103 @@
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+parameters:
+  - name: specPath
+    type: string
+    default: ''  # e.g. "tests/downloads/excel-file.spec.ts"
+
+variables:
+  nodeVersion: '20.x'
+  buildDir: 'dist'
+  artifactName: 'drop'
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '$(nodeVersion)'
+    displayName: 'Install Node.js $(nodeVersion)'
+
+  - task: Cache@2
+    inputs:
+      key: 'npm | "$(Agent.OS)" | package-lock.json'
+      restoreKeys: |
+        npm | "$(Agent.OS)"
+      path: ~/.npm
+    displayName: 'Cache NPM'
+
+  - script: |
+      npm ci
+    displayName: 'Install dependencies (npm ci)'
+
+  - script: |
+      npm run lint
+    displayName: 'Run linter (optional)'
+    condition: succeededOrFailed()
+    continueOnError: true
+
+  - script: |
+      npm run build
+    displayName: 'Build (npm run build)'
+    env:
+      NODE_ENV: 'production'
+    condition: succeeded()
+
+  - script: |
+      npx playwright install --with-deps
+    displayName: 'Install Playwright browsers'
+    condition: succeeded()
+
+  - script: |
+      if [ -n "${{ parameters.specPath }}" ]; then
+        echo "Running tests for specific spec: ${{ parameters.specPath }}"
+        npx playwright test "${{ parameters.specPath }}" --forbid-only --reporter=junit
+      else
+        echo "Running full test suite"
+        npx playwright test --forbid-only --reporter=junit
+      fi
+    displayName: 'Run Playwright tests (generate JUnit XML)'
+    continueOnError: false
+
+  - task: PublishTestResults@2
+    displayName: 'Publish test results (JUnit)'
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**/junit*.xml'
+      mergeTestResults: true
+      failTaskOnFailedTests: true
+
+  - script: |
+      mkdir -p $(Build.ArtifactStagingDirectory)
+      cp -R $(buildDir)/* $(Build.ArtifactStagingDirectory) || true
+    displayName: 'Stage build artifacts'
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: '$(artifactName)'
+    displayName: 'Publish pipeline artifact'
+
+# Optional deployment stage — fill azureSubscription/webAppName if you want auto-deploy
+stages:
+  - stage: Deploy
+    displayName: 'Deploy'
+    condition: succeeded()
+    jobs:
+      - deployment: DeployWeb
+        environment: 'production'
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  displayName: 'Deploy to Azure Web App (placeholder)'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appName: '$(webAppName)'
+                    package: '$(Pipeline.Workspace)/_$(artifactName)/**'
