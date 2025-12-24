@@ -20,7 +20,6 @@ stages:
               versionSpec: '$(nodeVersion)'
             displayName: 'Install Node.js'
 
-          # configure npm cache
           - script: |
               mkdir -p $(npmCacheDir)
               npm config set cache $(npmCacheDir)
@@ -38,31 +37,33 @@ stages:
               npm ci
             displayName: 'Install dependencies'
 
-          # Install Playwright browser binaries (Chromium only)
+          # Install Playwright browser
           - script: |
               npx playwright install chromium
               sudo npx playwright install-deps chromium
             displayName: 'Install Playwright Chromium'
 
-          # Run Playwright test and produce BOTH JUnit + HTML reports
+          # Run tests and generate JUnit + HTML
           - script: |
               npx playwright test \
                 --reporter=junit,html \
-                --forbid-only
-            displayName: 'Run Playwright tests (JUnit + HTML report)'
+                --output=test-results
+            displayName: 'Run Playwright tests'
 
-          # Publish JUnit to Azure DevOps Tests tab
+          # Surface results in Tests tab (from Microsoft doc)
           - task: PublishTestResults@2
+            displayName: 'Publish results to Tests tab'
             inputs:
               testResultsFormat: 'JUnit'
-              testResultsFiles: '**/junit*.xml'
+              testResultsFiles: 'test-results/*.xml'
+              searchFolder: '$(System.DefaultWorkingDirectory)'
               mergeTestResults: true
-              failTaskOnFailedTests: true
-            displayName: 'Publish test results to Tests tab'
+              testRunTitle: 'Playwright UI automation tests'
+              failTaskOnFailedTests: false
 
-          # Publish Playwright HTML report (detailed steps)
+          # Publish detailed HTML report (with steps)
           - task: PublishPipelineArtifact@1
             inputs:
               targetPath: 'playwright-report'
               artifact: 'playwright-html-report'
-            displayName: 'Publish Playwright HTML report (with steps)'
+            displayName: 'Publish Playwright HTML report'
