@@ -37,20 +37,33 @@ stages:
               npm ci
             displayName: 'Install dependencies'
 
-          # Install Playwright browser
+          # Install Playwright browser binaries
           - script: |
               npx playwright install chromium
               sudo npx playwright install-deps chromium
             displayName: 'Install Playwright Chromium'
 
-          # Run tests and generate BOTH JUnit + HTML report
+          # Debug listing before test run
+          - script: |
+              echo "Listing workspace before tests:"
+              ls -R
+            displayName: 'Debug: list files before tests'
+
+          # Run Playwright tests and generate JUnit + HTML
           - script: |
               mkdir -p test-results
-              PWTEST_JUNIT_OUTPUT=test-results/junit.xml \
-              npx playwright test --reporter=junit,html --forbid-only
+              npx playwright test \
+                --reporter=junit=test-results/junit.xml,html \
+                --forbid-only
             displayName: 'Run Playwright tests (JUnit + HTML)'
 
-          # Surface test results in Tests tab
+          # Debug listing after test run
+          - script: |
+              echo "Listing workspace after tests:"
+              ls -R
+            displayName: 'Debug: list files after tests'
+
+          # Publish JUnit to Tests tab
           - task: PublishTestResults@2
             displayName: 'Publish results to Tests tab'
             inputs:
@@ -60,7 +73,7 @@ stages:
               testRunTitle: 'Playwright UI automation tests'
               failTaskOnFailedTests: false
 
-          # Publish detailed Playwright HTML report (steps, screenshots, traces)
+          # Publish HTML report (steps, screenshots, trace viewer)
           - task: PublishPipelineArtifact@1
             inputs:
               targetPath: 'playwright-report'
