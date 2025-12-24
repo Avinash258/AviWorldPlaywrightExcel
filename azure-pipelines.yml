@@ -72,3 +72,11 @@ stages:
               targetPath: '$(Build.ArtifactStagingDirectory)'
               artifact: '$(artifactName)'
             displayName: 'Publish pipeline artifact'
+
+          # Publish the test downloads (includes the updated Excel file)
+          - task: PublishPipelineArtifact@1
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: '$(System.DefaultWorkingDirectory)/download'
+              artifact: 'test-downloads'
+            displayName: 'Publish test downloads (download/)'}

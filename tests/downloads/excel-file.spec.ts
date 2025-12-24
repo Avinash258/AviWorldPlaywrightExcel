@@ -7,7 +7,7 @@ import path from 'path';
 import type * as ExcelJSType from 'exceljs';
 
 test.describe('File Downloader - Functional', () => {
-  test("Download Excel file and verify it's a valid spreadsheet", async ({ page }) => {
+  test("Download Excel file and verify it's a valid spreadsheet", async ({ page }, testInfo) => {
     // 1. Click `excelParaValidar.xlsx` and capture download.
     await page.goto('https://the-internet.herokuapp.com/download');
 
@@ -73,8 +73,19 @@ test.describe('File Downloader - Functional', () => {
         if (vals.every((v: string) => v === 'test')) foundRowAllTest = true;
       });
       expect(foundRowAllTest).toBeTruthy();
+
+      // Attach the (possibly updated) Excel file to the Playwright report
+      await testInfo.attach('excel-updated', {
+        path: savedPath,
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
     } else {
       // No workbook-specific assertions when exceljs isn't installed.
+      // Still attach the downloaded file to the report for debugging/recording
+      await testInfo.attach('excel-original', {
+        path: savedPath,
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
     }
 
     // 4. Optionally, check file size > 0 and suggested filename equals `excelParaValidar.xlsx`.
