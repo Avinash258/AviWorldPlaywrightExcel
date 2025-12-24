@@ -1,0 +1,74 @@
+trigger:
+  - main
+
+parameters:
+  - name: specPath
+    type: string
+    default: ''  # e.g. tests/downloads/excel-file.spec.ts to run a single spec
+
+variables:
+  nodeVersion: '20.x'
+  buildDir: 'dist'
+  artifactName: 'drop'
+
+stages:
+  - stage: BuildAndTest
+    displayName: Build and Test (without build step)
+    jobs:
+      - job: BuildJob
+        displayName: Build job
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(nodeVersion)'
+            displayName: 'Install Node.js $(nodeVersion)'
+
+          - task: Cache@2
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: ~/.npm
+            displayName: 'Cache NPM'
+
+          - script: |
+              npm ci
+            displayName: 'Install dependencies (npm ci)'
+
+          # Removed: npm run build
+
+          - script: |
+              npx playwright install --with-deps
+            displayName: 'Install Playwright browsers'
+
+          - script: |
+              if [ -n "${{ parameters.specPath }}" ]; then
+                echo "Running tests for specific spec: ${{ parameters.specPath }}"
+                npx playwright test "${{ parameters.specPath }}" --forbid-only --reporter=junit
+              else
+                echo "Running full test suite"
+                npx playwright test --forbid-only --reporter=junit
+              fi
+            displayName: 'Run Playwright tests (generate JUnit XML)'
+
+          - task: PublishTestResults@2
+            displayName: 'Publish test results (JUnit)'
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: '**/junit*.xml'
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+
+          - script: |
+              mkdir -p $(Build.ArtifactStagingDirectory)
+              cp -R $(buildDir)/* $(Build.ArtifactStagingDirectory) || true
+            displayName: 'Stage build artifacts (optional)'
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)'
+              artifact: '$(artifactName)'
+            displayName: 'Publish pipeline artifact'
