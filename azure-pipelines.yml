@@ -43,25 +43,24 @@ stages:
               sudo npx playwright install-deps chromium
             displayName: 'Install Playwright Chromium'
 
-          # Run tests and generate JUnit + HTML
+          # Run tests and generate BOTH JUnit + HTML report
           - script: |
-              npx playwright test \
-                --reporter=junit,html \
-                --output=test-results
-            displayName: 'Run Playwright tests'
+              mkdir -p test-results
+              PWTEST_JUNIT_OUTPUT=test-results/junit.xml \
+              npx playwright test --reporter=junit,html --forbid-only
+            displayName: 'Run Playwright tests (JUnit + HTML)'
 
-          # Surface results in Tests tab (from Microsoft doc)
+          # Surface test results in Tests tab
           - task: PublishTestResults@2
             displayName: 'Publish results to Tests tab'
             inputs:
               testResultsFormat: 'JUnit'
-              testResultsFiles: 'test-results/*.xml'
-              searchFolder: '$(System.DefaultWorkingDirectory)'
+              testResultsFiles: 'test-results/junit.xml'
               mergeTestResults: true
               testRunTitle: 'Playwright UI automation tests'
               failTaskOnFailedTests: false
 
-          # Publish detailed HTML report (with steps)
+          # Publish detailed Playwright HTML report (steps, screenshots, traces)
           - task: PublishPipelineArtifact@1
             inputs:
               targetPath: 'playwright-report'
