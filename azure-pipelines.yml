@@ -1,57 +1,54 @@
 trigger:
   - main
 
-parameters:
-  - name: specPath
-    type: string
-    default: ''  # e.g. tests/downloads/excel-file.spec.ts to run a single spec
-
 variables:
   nodeVersion: '20.x'
-  buildDir: 'dist'
   artifactName: 'drop'
+  npmCacheDir: '$(Pipeline.Workspace)/.npm'
 
 stages:
   - stage: BuildAndTest
-    displayName: Build and Test (without build step)
+    displayName: Excel Playwright tests
     jobs:
       - job: BuildJob
-        displayName: Build job
+        displayName: Run Excel tests
         pool:
           vmImage: 'ubuntu-latest'
+
         steps:
           - task: NodeTool@0
             inputs:
               versionSpec: '$(nodeVersion)'
-            displayName: 'Install Node.js $(nodeVersion)'
+            displayName: 'Install Node.js'
+
+          # configure npm cache
+          - script: |
+              mkdir -p $(npmCacheDir)
+              npm config set cache $(npmCacheDir)
+            displayName: 'Configure npm cache'
 
           - task: Cache@2
             inputs:
               key: 'npm | "$(Agent.OS)" | package-lock.json'
               restoreKeys: |
                 npm | "$(Agent.OS)"
-              path: ~/.npm
+              path: '$(npmCacheDir)'
             displayName: 'Cache NPM'
 
           - script: |
               npm ci
-            displayName: 'Install dependencies (npm ci)'
+            displayName: 'Install dependencies'
 
-          # Removed: npm run build
-
+          # install ONLY Chrome
           - script: |
-              npx playwright install --with-deps
-            displayName: 'Install Playwright browsers'
+              npx playwright install chrome
+              sudo npx playwright install-deps chrome
+            displayName: 'Install Chrome for Playwright'
 
+          # run ONLY your npm script
           - script: |
-              if [ -n "${{ parameters.specPath }}" ]; then
-                echo "Running tests for specific spec: ${{ parameters.specPath }}"
-                npx playwright test "${{ parameters.specPath }}" --forbid-only --reporter=junit
-              else
-                echo "Running full test suite"
-                npx playwright test --forbid-only --reporter=junit
-              fi
-            displayName: 'Run Playwright tests (generate JUnit XML)'
+              npm run test:excel -- --forbid-only --reporter=junit
+            displayName: 'Run Playwright Excel tests'
 
           - task: PublishTestResults@2
             displayName: 'Publish test results (JUnit)'
@@ -61,14 +58,3 @@ stages:
               testResultsFiles: '**/junit*.xml'
               mergeTestResults: true
               failTaskOnFailedTests: true
-
-          - script: |
-              mkdir -p $(Build.ArtifactStagingDirectory)
-              cp -R $(buildDir)/* $(Build.ArtifactStagingDirectory) || true
-            displayName: 'Stage build artifacts (optional)'
-
-          - task: PublishPipelineArtifact@1
-            inputs:
-              targetPath: '$(Build.ArtifactStagingDirectory)'
-              artifact: '$(artifactName)'
-            displayName: 'Publish pipeline artifact'
