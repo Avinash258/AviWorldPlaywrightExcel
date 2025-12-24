@@ -10,6 +10,7 @@ stages:
     displayName: Playwright Excel Tests
     jobs:
       - job: RunExcelTests
+        displayName: Run Playwright Excel Tests
         pool:
           vmImage: 'ubuntu-latest'
 
@@ -19,7 +20,7 @@ stages:
               versionSpec: '$(nodeVersion)'
             displayName: 'Install Node.js'
 
-          # configure npm cache safely
+          # configure npm cache
           - script: |
               mkdir -p $(npmCacheDir)
               npm config set cache $(npmCacheDir)
@@ -31,27 +32,37 @@ stages:
               restoreKeys: |
                 npm | "$(Agent.OS)"
               path: '$(npmCacheDir)'
-            displayName: 'Cache NPM'
+            displayName: 'Cache npm modules'
 
           - script: |
               npm ci
             displayName: 'Install dependencies'
 
-          # ✅ install Playwright browser (Chromium)
+          # Install Playwright browser binaries (Chromium only)
           - script: |
               npx playwright install chromium
               sudo npx playwright install-deps chromium
-            displayName: 'Install Playwright Chromium browser'
+            displayName: 'Install Playwright Chromium'
 
-          # ✅ run ONLY your npm script
+          # Run Playwright test and produce BOTH JUnit + HTML reports
           - script: |
-              npm run test:excel -- --forbid-only --reporter=junit
-            displayName: 'Run Playwright Excel tests'
+              npx playwright test \
+                --reporter=junit,html \
+                --forbid-only
+            displayName: 'Run Playwright tests (JUnit + HTML report)'
 
+          # Publish JUnit to Azure DevOps Tests tab
           - task: PublishTestResults@2
             inputs:
               testResultsFormat: 'JUnit'
               testResultsFiles: '**/junit*.xml'
               mergeTestResults: true
               failTaskOnFailedTests: true
-            displayName: 'Publish test results'
+            displayName: 'Publish test results to Tests tab'
+
+          # Publish Playwright HTML report (detailed steps)
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: 'playwright-report'
+              artifact: 'playwright-html-report'
+            displayName: 'Publish Playwright HTML report (with steps)'
